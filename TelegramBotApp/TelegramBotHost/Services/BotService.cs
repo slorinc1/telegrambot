@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
@@ -21,11 +22,15 @@ namespace TelegramBotHost
 
         private readonly IWebHostEnvironment _env;
 
+        private readonly HttpClient _httpClient;
+
         public TelegramBotService(IWebHostEnvironment env)
         {
             _env = env;
 
             Init().Wait();
+
+            _httpClient = new HttpClient();
         }
 
         public async Task Init()
@@ -245,9 +250,17 @@ namespace TelegramBotHost
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            while(!stoppingToken.IsCancellationRequested)
+            while (!stoppingToken.IsCancellationRequested)
             {
-                await Task.Delay(TimeSpan.FromDays(1));
+                try
+                {
+                    await _httpClient.GetAsync("https://telegrambothost.herokuapp.com/");
+                }
+                catch
+                {
+                }
+
+                await Task.Delay(TimeSpan.FromMinutes(15));
             }
         }
     }
