@@ -16,6 +16,9 @@ namespace TelegramBotHost
             Host.CreateDefaultBuilder(args)
             .ConfigureAppConfiguration((hostingContext, config) =>
             {
+                config.AddJsonFile("appsettings.Development.json",
+                    optional: true,
+                    reloadOnChange: true);
                 config.AddJsonFile("appsettings.json",
                     optional: true,
                     reloadOnChange: true)
