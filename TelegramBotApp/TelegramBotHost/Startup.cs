@@ -24,6 +24,8 @@ namespace TelegramBotHost
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddControllersWithViews();
+
+            services.AddHostedService<TelegramBotService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -52,9 +54,6 @@ namespace TelegramBotHost
                     name: "default",
                     pattern: "{controller=Home}/{action=Index}/{id?}");
             });
-
-            var bot = new TelegramBotService(env);
-            bot.Run().ConfigureAwait(false);
         }
     }
 }

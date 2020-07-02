@@ -1,8 +1,10 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
 using Telegram.Bot;
 using Telegram.Bot.Args;
 using Telegram.Bot.Types;
@@ -13,40 +15,50 @@ using Telegram.Bot.Types.ReplyMarkups;
 
 namespace TelegramBotHost
 {
-    public class TelegramBotService
+    public class TelegramBotService : BackgroundService
     {
-        private   TelegramBotClient Bot;
+        private TelegramBotClient _bot;
 
-        IWebHostEnvironment _env;
+        private readonly IWebHostEnvironment _env;
 
         public TelegramBotService(IWebHostEnvironment env)
         {
             _env = env;
+
+            Init().Wait();
         }
 
-        public   async Task Run()
+        public async Task Init()
         {
-            Bot = new TelegramBotClient("1107861683:AAHUxiRh1OvBXjT0Xm8aXnLv1hbQ9Wiqszo");
+            _bot = new TelegramBotClient("1107861683:AAHUxiRh1OvBXjT0Xm8aXnLv1hbQ9Wiqszo");
 
-            var me = await Bot.GetMeAsync();
+            var me = await _bot.GetMeAsync();
             Console.Title = me.Username;
 
-            Bot.OnMessage += BotOnMessageReceived;
-            Bot.OnMessageEdited += BotOnMessageReceived;
+            _bot.OnMessage += BotOnMessageReceived;
+            _bot.OnMessageEdited += BotOnMessageReceived;
 
-            Bot.OnCallbackQuery += BotOnCallbackQueryReceived;
-            Bot.OnInlineQuery += BotOnInlineQueryReceived;
-            Bot.OnInlineResultChosen += BotOnChosenInlineResultReceived;
-            Bot.OnReceiveError += BotOnReceiveError;
-
-            Bot.StartReceiving(Array.Empty<UpdateType>());
-            Console.WriteLine($"Start listening for @{me.Username}");
-
-            Console.ReadLine();
-            Bot.StopReceiving();
+            _bot.OnCallbackQuery += BotOnCallbackQueryReceived;
+            _bot.OnInlineQuery += BotOnInlineQueryReceived;
+            _bot.OnInlineResultChosen += BotOnChosenInlineResultReceived;
+            _bot.OnReceiveError += BotOnReceiveError;
         }
 
-        private   async void BotOnMessageReceived(object sender, MessageEventArgs messageEventArgs)
+        public override Task StartAsync(CancellationToken cancellationToken)
+        {
+            _bot.StartReceiving(Array.Empty<UpdateType>());
+
+            return base.StartAsync(cancellationToken);
+        }
+
+        public override Task StopAsync(CancellationToken cancellationToken)
+        {
+            _bot.StopReceiving();
+
+            return base.StopAsync(cancellationToken);
+        }
+
+        private async void BotOnMessageReceived(object sender, MessageEventArgs messageEventArgs)
         {
             var message = messageEventArgs.Message;
             if (message == null || message.Type != MessageType.Text)
@@ -82,9 +94,9 @@ namespace TelegramBotHost
 
         // Send inline keyboard
         // You can process responses in BotOnCallbackQueryReceived handler
-          async Task SendInlineKeyboard(Message message)
+        async Task SendInlineKeyboard(Message message)
         {
-            await Bot.SendChatActionAsync(message.Chat.Id, ChatAction.Typing);
+            await _bot.SendChatActionAsync(message.Chat.Id, ChatAction.Typing);
 
             // Simulate longer running task
             await Task.Delay(500);
@@ -98,14 +110,14 @@ namespace TelegramBotHost
                         InlineKeyboardButton.WithCallbackData("No", "Booo"),
                     }
                 });
-            await Bot.SendTextMessageAsync(
+            await _bot.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: "Are you a squirrel?",
                 replyMarkup: inlineKeyboard
             );
         }
 
-          async Task SendReplyKeyboard(Message message)
+        async Task SendReplyKeyboard(Message message)
         {
             var replyKeyboardMarkup = new ReplyKeyboardMarkup(
                 new KeyboardButton[][]
@@ -116,7 +128,7 @@ namespace TelegramBotHost
                 resizeKeyboard: true
             );
 
-            await Bot.SendTextMessageAsync(
+            await _bot.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: "Choose",
                 replyMarkup: replyKeyboardMarkup
@@ -124,43 +136,43 @@ namespace TelegramBotHost
             );
         }
 
-          async Task SendDocument(Message message, bool squarel)
+        async Task SendDocument(Message message, bool squarel)
         {
-            await Bot.SendChatActionAsync(message.Chat.Id, ChatAction.UploadPhoto);
+            await _bot.SendChatActionAsync(message.Chat.Id, ChatAction.UploadPhoto);
 
             string picName = $"{(squarel ? ("yes.jpg") : ("no.jpg")) }";
             string filePath = Path.Combine(_env.WebRootPath, picName);
             using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             var fileName = filePath.Split(Path.DirectorySeparatorChar).Last();
-            await Bot.SendPhotoAsync(
+            await _bot.SendPhotoAsync(
                 chatId: message.Chat.Id,
                 photo: new InputOnlineFile(fileStream, fileName),
                 caption: squarel ? "Yeee" : "Boo"
             );
         }
 
-          async Task RequestContactAndLocation(Message message)
+        async Task RequestContactAndLocation(Message message)
         {
             var RequestReplyKeyboard = new ReplyKeyboardMarkup(new[]
             {
                     KeyboardButton.WithRequestLocation("Location"),
                     KeyboardButton.WithRequestContact("Contact"),
                 });
-            await Bot.SendTextMessageAsync(
+            await _bot.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: "Who or Where are you?",
                 replyMarkup: RequestReplyKeyboard
             );
         }
 
-          async Task Usage(Message message)
+        async Task Usage(Message message)
         {
             const string usage = "Usage:\n" +
                                     "/inline   - send inline keyboard\n" +
                                     "/keyboard - send custom keyboard\n" +
                                     "/photo    - send a photo\n" +
                                     "/request  - request location or contact";
-            await Bot.SendTextMessageAsync(
+            await _bot.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: usage,
                 replyMarkup: new ReplyKeyboardRemove()
@@ -168,16 +180,16 @@ namespace TelegramBotHost
         }
 
         // Process Inline Keyboard callback data
-        private   async void BotOnCallbackQueryReceived(object sender, CallbackQueryEventArgs callbackQueryEventArgs)
+        private async void BotOnCallbackQueryReceived(object sender, CallbackQueryEventArgs callbackQueryEventArgs)
         {
             var callbackQuery = callbackQueryEventArgs.CallbackQuery;
 
-            await Bot.AnswerCallbackQueryAsync(
+            await _bot.AnswerCallbackQueryAsync(
                 callbackQueryId: callbackQuery.Id,
                 text: $"{callbackQuery.Data}"
             );
 
-            await Bot.SendTextMessageAsync(
+            await _bot.SendTextMessageAsync(
                 chatId: callbackQuery.Message.Chat.Id,
                 text: $"{callbackQuery.Data}"
             );
@@ -194,7 +206,7 @@ namespace TelegramBotHost
 
         #region Inline Mode
 
-        private   async void BotOnInlineQueryReceived(object sender, InlineQueryEventArgs inlineQueryEventArgs)
+        private async void BotOnInlineQueryReceived(object sender, InlineQueryEventArgs inlineQueryEventArgs)
         {
             Console.WriteLine($"Received inline query from: {inlineQueryEventArgs.InlineQuery.From.Id}");
 
@@ -208,7 +220,7 @@ namespace TelegramBotHost
                     )
                 )
             };
-            await Bot.AnswerInlineQueryAsync(
+            await _bot.AnswerInlineQueryAsync(
                 inlineQueryId: inlineQueryEventArgs.InlineQuery.Id,
                 results: results,
                 isPersonal: true,
@@ -216,19 +228,27 @@ namespace TelegramBotHost
             );
         }
 
-        private   void BotOnChosenInlineResultReceived(object sender, ChosenInlineResultEventArgs chosenInlineResultEventArgs)
+        private void BotOnChosenInlineResultReceived(object sender, ChosenInlineResultEventArgs chosenInlineResultEventArgs)
         {
             Console.WriteLine($"Received inline result: {chosenInlineResultEventArgs.ChosenInlineResult.ResultId}");
         }
 
         #endregion
 
-        private   void BotOnReceiveError(object sender, ReceiveErrorEventArgs receiveErrorEventArgs)
+        private void BotOnReceiveError(object sender, ReceiveErrorEventArgs receiveErrorEventArgs)
         {
             Console.WriteLine("Received error: {0} — {1}",
                 receiveErrorEventArgs.ApiRequestException.ErrorCode,
                 receiveErrorEventArgs.ApiRequestException.Message
             );
+        }
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            while(!stoppingToken.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromDays(1));
+            }
         }
     }
 }
