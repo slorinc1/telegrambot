@@ -25,6 +25,7 @@ namespace TelegramBotHost
         {
             services.AddControllersWithViews();
 
+            services.Configure<BotToken>(Configuration.GetSection(nameof(BotToken)));
             services.AddHostedService<TelegramBotService>();
         }
 

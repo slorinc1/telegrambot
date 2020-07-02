@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Telegram.Bot;
 using Telegram.Bot.Args;
 using Telegram.Bot.Types;
@@ -24,10 +25,12 @@ namespace TelegramBotHost
 
         private readonly HttpClient _httpClient;
 
-        public TelegramBotService(IWebHostEnvironment env)
+        BotToken _options;
+
+        public TelegramBotService(IWebHostEnvironment env, IOptions<BotToken> options)
         {
             _env = env;
-
+            _options = options.Value;
             Init().Wait();
 
             _httpClient = new HttpClient();
@@ -35,7 +38,7 @@ namespace TelegramBotHost
 
         public async Task Init()
         {
-            _bot = new TelegramBotClient("1107861683:AAHUxiRh1OvBXjT0Xm8aXnLv1hbQ9Wiqszo");
+            _bot = new TelegramBotClient(_options.Token);
 
             var me = await _bot.GetMeAsync();
             Console.Title = me.Username;
@@ -176,7 +179,8 @@ namespace TelegramBotHost
                                     "/inline   - send inline keyboard\n" +
                                     "/keyboard - send custom keyboard\n" +
                                     "/photo    - send a photo\n" +
-                                    "/request  - request location or contact";
+                                    "/request  - request location or contact" + "\n" +
+                                    "Contanct:   slorinc@mail.com";
             await _bot.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: usage,
