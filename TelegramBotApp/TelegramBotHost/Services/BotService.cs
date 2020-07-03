@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
@@ -17,6 +18,15 @@ using Telegram.Bot.Types.ReplyMarkups;
 
 namespace TelegramBotHost
 {
+    public class AnswerModel
+    {
+        public string Type { get; set; }
+
+        public string Sentence1 { get; set; }
+
+        public string Sentence2 { get; set; }
+    }
+
     public class TelegramBotService : BackgroundService
     {
         private TelegramBotClient _bot;
@@ -25,12 +35,18 @@ namespace TelegramBotHost
 
         private readonly HttpClient _httpClient;
 
-        BotToken _options;
+        private readonly BotToken _options;
 
-        public TelegramBotService(IWebHostEnvironment env, IOptions<BotToken> options)
+        private readonly WordsService _wordsService;
+
+        public TelegramBotService(
+            IWebHostEnvironment env,
+            WordsService wordsService,
+            IOptions<BotToken> options)
         {
             _env = env;
             _options = options.Value;
+            _wordsService = wordsService;
             Init().Wait();
 
             _httpClient = new HttpClient();
@@ -80,18 +96,8 @@ namespace TelegramBotHost
                     break;
 
                 // send custom keyboard
-                case "/keyboard":
+                case "/word":
                     await SendReplyKeyboard(message);
-                    break;
-
-                // send a photo
-                case "/photo":
-                    //await SendDocument(message);
-                    break;
-
-                // request location or contact
-                case "/request":
-                    await RequestContactAndLocation(message);
                     break;
 
                 default:
@@ -117,7 +123,8 @@ namespace TelegramBotHost
                         InlineKeyboardButton.WithCallbackData("Yes", "Yeee"),
                         InlineKeyboardButton.WithCallbackData("No", "Booo"),
                     }
-                });
+            });
+
             await _bot.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: "Are you a squirrel?",
@@ -127,20 +134,23 @@ namespace TelegramBotHost
 
         async Task SendReplyKeyboard(Message message)
         {
-            var replyKeyboardMarkup = new ReplyKeyboardMarkup(
-                new KeyboardButton[][]
-                {
-                        new KeyboardButton[] { "1.1", "1.2" },
-                        new KeyboardButton[] { "2.1", "2.2" },
-                },
-                resizeKeyboard: true
-            );
+            var newWord = await _wordsService.GetWordAsync();
+
+            var inlineKeyboard = new InlineKeyboardMarkup(new[]
+            {
+                    // first row
+                    new []
+                    {
+                        InlineKeyboardButton.WithCallbackData("Infinitive", $"inf;{newWord}"),
+                        InlineKeyboardButton.WithCallbackData("Gerund", $"ger;{newWord}"),
+                        InlineKeyboardButton.WithCallbackData("Both", $"both;{newWord}"),
+                    }
+            });
 
             await _bot.SendTextMessageAsync(
                 chatId: message.Chat.Id,
-                text: "Choose",
-                replyMarkup: replyKeyboardMarkup
-
+                text: newWord,
+                replyMarkup: inlineKeyboard
             );
         }
 
@@ -196,19 +206,77 @@ namespace TelegramBotHost
                 text: $"{callbackQuery.Data}"
             );
 
-            await _bot.SendTextMessageAsync(
-                chatId: callbackQuery.Message.Chat.Id,
-                text: $"{callbackQuery.Data}"
-            );
-
             if (callbackQuery.Data == "Yeee")
             {
                 await SendDocument(callbackQuery.Message, true);
             }
-            else
+            else if (callbackQuery.Data == "Boo")
             {
                 await SendDocument(callbackQuery.Message, false);
             }
+
+            if (callbackQuery.Data.StartsWith("inf"))
+            {
+                await SendAnswerToWord(callbackQuery.Message, callbackQuery.Data);
+            }
+            else if (callbackQuery.Data.StartsWith("ger"))
+            {
+                await SendAnswerToWord(callbackQuery.Message, callbackQuery.Data);
+            }
+            if (callbackQuery.Data.StartsWith("both"))
+            {
+                await SendAnswerToWord(callbackQuery.Message, callbackQuery.Data);
+            }
+        }
+
+        private string GetWordType(string type)
+        {
+            return type.Split(new char[] { ';' })[0];
+        }
+
+        private string GetWord(string type)
+        {
+            return type.Split(new char[] { ';' })[1];
+        }
+
+        private async Task SendAnswerToWord(Message message, string data)
+        {
+
+            var w = GetWord(data);
+            var t = GetWordType(data);
+
+            var answer = await _wordsService.GetAnswerAsync(w);
+
+            if (answer.Type == t)
+            {
+                await _bot.SendTextMessageAsync(
+                chatId: message.Chat.Id,
+                text: "Yee :))))" );
+            }
+            else
+            {
+                await _bot.SendTextMessageAsync(
+                chatId: message.Chat.Id,
+                text: "Almost");
+            }
+
+            var sb = new StringBuilder();
+            if (!string.IsNullOrEmpty(answer.Sentence1))
+            {
+                sb.AppendLine("To: " + answer.Sentence1);
+            }
+
+            if (!string.IsNullOrEmpty(answer.Sentence2))
+            {
+                sb.AppendLine("Ing: " + answer.Sentence2);
+            }
+
+            sb.AppendLine("/word - Ask a new word");
+
+            await _bot.SendTextMessageAsync(
+                chatId: message.Chat.Id,
+                text: sb.ToString()
+            );
         }
 
         #region Inline Mode

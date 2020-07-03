@@ -27,13 +27,15 @@ namespace TelegramBotHost
 
             services.Configure<BotToken>(Configuration.GetSection(nameof(BotToken)));
             services.AddHostedService<TelegramBotService>();
+            services.AddHttpClient<WordsService>().ConfigureHttpClient(x =>
+            {
+                x.BaseAddress = new Uri("https://mokusapp.herokuapp.com/", UriKind.Absolute);
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            throw new Exception();
-
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
