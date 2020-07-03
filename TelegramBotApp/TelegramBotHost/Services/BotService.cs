@@ -177,10 +177,8 @@ namespace TelegramBotHost
         {
             const string usage = "Usage:\n" +
                                     "/inline   - send inline keyboard\n" +
-                                    "/keyboard - send custom keyboard\n" +
-                                    "/photo    - send a photo\n" +
-                                    "/request  - request location or contact" + "\n" +
-                                    "Contanct:   slorinc@mail.com";
+                                    "/word - ask a word\n" +
+                                    "Contact:    lorinc@mail.com";
             await _bot.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: usage,
