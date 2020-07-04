@@ -18,15 +18,6 @@ using Telegram.Bot.Types.ReplyMarkups;
 
 namespace TelegramBotHost
 {
-    public class AnswerModel
-    {
-        public string Type { get; set; }
-
-        public string Sentence1 { get; set; }
-
-        public string Sentence2 { get; set; }
-    }
-
     public class TelegramBotService : BackgroundService
     {
         private TelegramBotClient _bot;
@@ -44,18 +35,18 @@ namespace TelegramBotHost
             WordsService wordsService,
             IOptions<BotToken> options)
         {
+            _bot = new TelegramBotClient(_options.Token);
             _env = env;
             _options = options.Value;
             _wordsService = wordsService;
-            Init().Wait();
 
             _httpClient = new HttpClient();
+
+            Init().Wait();
         }
 
         public async Task Init()
         {
-            _bot = new TelegramBotClient(_options.Token);
-
             var me = await _bot.GetMeAsync();
             Console.Title = me.Username;
 
@@ -63,6 +54,7 @@ namespace TelegramBotHost
             _bot.OnMessageEdited += BotOnMessageReceived;
 
             _bot.OnCallbackQuery += BotOnCallbackQueryReceived;
+
             _bot.OnInlineQuery += BotOnInlineQueryReceived;
             _bot.OnInlineResultChosen += BotOnChosenInlineResultReceived;
             _bot.OnReceiveError += BotOnReceiveError;
@@ -169,20 +161,6 @@ namespace TelegramBotHost
             );
         }
 
-        async Task RequestContactAndLocation(Message message)
-        {
-            var RequestReplyKeyboard = new ReplyKeyboardMarkup(new[]
-            {
-                    KeyboardButton.WithRequestLocation("Location"),
-                    KeyboardButton.WithRequestContact("Contact"),
-                });
-            await _bot.SendTextMessageAsync(
-                chatId: message.Chat.Id,
-                text: "Who or Where are you?",
-                replyMarkup: RequestReplyKeyboard
-            );
-        }
-
         async Task Usage(Message message)
         {
             const string usage = "Usage:\n" +
@@ -200,11 +178,6 @@ namespace TelegramBotHost
         private async void BotOnCallbackQueryReceived(object sender, CallbackQueryEventArgs callbackQueryEventArgs)
         {
             var callbackQuery = callbackQueryEventArgs.CallbackQuery;
-
-            await _bot.AnswerCallbackQueryAsync(
-                callbackQueryId: callbackQuery.Id,
-                text: $"{callbackQuery.Data}"
-            );
 
             if (callbackQuery.Data == "Yeee")
             {
@@ -241,7 +214,6 @@ namespace TelegramBotHost
 
         private async Task SendAnswerToWord(Message message, string data)
         {
-
             var w = GetWord(data);
             var t = GetWordType(data);
 
