@@ -35,10 +35,11 @@ namespace TelegramBotHost
             WordsService wordsService,
             IOptions<BotToken> options)
         {
-            _bot = new TelegramBotClient(_options.Token);
             _env = env;
             _options = options.Value;
             _wordsService = wordsService;
+
+            _bot = new TelegramBotClient(_options.Token);
 
             _httpClient = new HttpClient();
 
