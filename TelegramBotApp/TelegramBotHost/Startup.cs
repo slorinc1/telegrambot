@@ -28,6 +28,8 @@ namespace TelegramBotHost
 
             services.Configure<BotToken>(Configuration.GetSection(nameof(BotToken)));
             services.Configure<AppConfiguration>(Configuration.GetSection(nameof(AppConfiguration)));
+            services.AddSingleton<MyBotClient>();
+
             services.AddHostedService<TelegramBotService>();
             services.AddHttpClient<WordsService>().ConfigureHttpClient(x =>
             {

@@ -3,6 +3,8 @@
     public class BotToken
     {
         public string Token { get; set; }
+
+        public long Id { get; set; }
     }
 
     public class AppConfiguration

@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using Telegram.Bot;
 using Telegram.Bot.Args;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -20,8 +19,6 @@ namespace TelegramBotHost
 {
     public class TelegramBotService : BackgroundService
     {
-        private TelegramBotClient _bot;
-
         private readonly IWebHostEnvironment _env;
 
         private readonly HttpClient _httpClient;
@@ -30,16 +27,18 @@ namespace TelegramBotHost
 
         private readonly WordsService _wordsService;
 
+        private MyBotClient _botClient;
+
         public TelegramBotService(
             IWebHostEnvironment env,
             WordsService wordsService,
-            IOptions<BotToken> options)
+            IOptions<BotToken> options,
+            MyBotClient myBotClient)
         {
             _env = env;
             _options = options.Value;
             _wordsService = wordsService;
-
-            _bot = new TelegramBotClient(_options.Token);
+            _botClient = myBotClient;
 
             _httpClient = new HttpClient();
 
@@ -48,29 +47,29 @@ namespace TelegramBotHost
 
         public async Task Init()
         {
-            var me = await _bot.GetMeAsync();
+            var me = await _botClient.Bot.GetMeAsync();
             Console.Title = me.Username;
 
-            _bot.OnMessage += BotOnMessageReceived;
-            _bot.OnMessageEdited += BotOnMessageReceived;
+            _botClient.Bot.OnMessage += BotOnMessageReceived;
+            _botClient.Bot.OnMessageEdited += BotOnMessageReceived;
 
-            _bot.OnCallbackQuery += BotOnCallbackQueryReceived;
+            _botClient.Bot.OnCallbackQuery += BotOnCallbackQueryReceived;
 
-            _bot.OnInlineQuery += BotOnInlineQueryReceived;
-            _bot.OnInlineResultChosen += BotOnChosenInlineResultReceived;
-            _bot.OnReceiveError += BotOnReceiveError;
+            _botClient.Bot.OnInlineQuery += BotOnInlineQueryReceived;
+            _botClient.Bot.OnInlineResultChosen += BotOnChosenInlineResultReceived;
+            _botClient.Bot.OnReceiveError += BotOnReceiveError;
         }
 
         public override Task StartAsync(CancellationToken cancellationToken)
         {
-            _bot.StartReceiving(Array.Empty<UpdateType>());
+            _botClient.Bot.StartReceiving(Array.Empty<UpdateType>());
 
             return base.StartAsync(cancellationToken);
         }
 
         public override Task StopAsync(CancellationToken cancellationToken)
         {
-            _bot.StopReceiving();
+            _botClient.Bot.StopReceiving();
 
             return base.StopAsync(cancellationToken);
         }
@@ -103,7 +102,7 @@ namespace TelegramBotHost
         // You can process responses in BotOnCallbackQueryReceived handler
         async Task SendInlineKeyboard(Message message)
         {
-            await _bot.SendChatActionAsync(message.Chat.Id, ChatAction.Typing);
+            await _botClient.Bot.SendChatActionAsync(message.Chat.Id, ChatAction.Typing);
 
             // Simulate longer running task
             await Task.Delay(500);
@@ -118,7 +117,7 @@ namespace TelegramBotHost
                     }
             });
 
-            await _bot.SendTextMessageAsync(
+            await _botClient.Bot.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: "Are you a squirrel?",
                 replyMarkup: inlineKeyboard
@@ -140,7 +139,7 @@ namespace TelegramBotHost
                     }
             });
 
-            await _bot.SendTextMessageAsync(
+            await _botClient.Bot.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: newWord,
                 replyMarkup: inlineKeyboard
@@ -149,13 +148,13 @@ namespace TelegramBotHost
 
         async Task SendDocument(Message message, bool squarel)
         {
-            await _bot.SendChatActionAsync(message.Chat.Id, ChatAction.UploadPhoto);
+            await _botClient.Bot.SendChatActionAsync(message.Chat.Id, ChatAction.UploadPhoto);
 
             string picName = $"{(squarel ? ("yes.jpg") : ("no.jpg")) }";
             string filePath = Path.Combine(_env.WebRootPath, picName);
             using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             var fileName = filePath.Split(Path.DirectorySeparatorChar).Last();
-            await _bot.SendPhotoAsync(
+            await _botClient.Bot.SendPhotoAsync(
                 chatId: message.Chat.Id,
                 photo: new InputOnlineFile(fileStream, fileName),
                 caption: squarel ? "Yeee" : "Boo"
@@ -168,7 +167,7 @@ namespace TelegramBotHost
                                     "/inline   - send inline keyboard\n" +
                                     "/word - ask a word\n" +
                                     "Contact:    lorinc@mail.com";
-            await _bot.SendTextMessageAsync(
+            await _botClient.Bot.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: usage,
                 replyMarkup: new ReplyKeyboardRemove()
@@ -222,13 +221,13 @@ namespace TelegramBotHost
 
             if (answer.Type == t)
             {
-                await _bot.SendTextMessageAsync(
+                await _botClient.Bot.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: "Yee :))))" );
             }
             else
             {
-                await _bot.SendTextMessageAsync(
+                await _botClient.Bot.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: "Almost");
             }
@@ -246,7 +245,7 @@ namespace TelegramBotHost
 
             sb.AppendLine("/word - Ask a new word");
 
-            await _bot.SendTextMessageAsync(
+            await _botClient.Bot.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: sb.ToString()
             );
@@ -268,7 +267,7 @@ namespace TelegramBotHost
                     )
                 )
             };
-            await _bot.AnswerInlineQueryAsync(
+            await _botClient.Bot.AnswerInlineQueryAsync(
                 inlineQueryId: inlineQueryEventArgs.InlineQuery.Id,
                 results: results,
                 isPersonal: true,
