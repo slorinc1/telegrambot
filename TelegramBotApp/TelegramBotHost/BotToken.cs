@@ -5,6 +5,8 @@
         public string Token { get; set; }
 
         public long Id { get; set; }
+
+        public string Secret { get; set; }
     }
 
     public class AppConfiguration

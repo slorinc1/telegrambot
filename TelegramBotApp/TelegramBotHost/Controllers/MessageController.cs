@@ -17,12 +17,13 @@ namespace TelegramBotHost.Controllers
         }
 
         [HttpGet]
-        public async System.Threading.Tasks.Task<IActionResult> SendAsync([FromQuery] string m)
+        public async System.Threading.Tasks.Task<IActionResult> SendAsync([FromQuery] string m, [FromQuery] string s)
         {
-            var chat = new ChatId(_options.Value.Id);
-
-            await _myBotClient.Bot.SendTextMessageAsync(chat, m);
-
+            if (s == _options.Value.Secret)
+            {
+                var chat = new ChatId(_options.Value.Id);
+                await _myBotClient.Bot.SendTextMessageAsync(chat, m);
+            }
             return Ok();
         }
     }
